@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-field text-ink font-body antialiased; }
+  h1, h2, h3 { @apply font-display; }
+  :focus-visible { outline: 2px solid #D9951C; outline-offset: 2px; }
+  input, select, textarea { @apply bg-paper border border-line rounded-md px-3 py-2 w-full text-base; }
+  input:focus, select:focus, textarea:focus { @apply border-ink outline-none ring-2 ring-turmeric/40; }
+  label { @apply block text-sm font-medium text-inkSoft mb-1; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 font-medium transition-colors disabled:opacity-50; }
+  .btn-primary { @apply btn bg-ink text-paper hover:bg-inkSoft; }
+  .btn-ghost { @apply btn border border-line bg-paper text-ink hover:bg-field; }
+  .btn-clay { @apply btn bg-clay text-paper hover:opacity-90; }
+  .panel { @apply bg-paper border border-line rounded-lg p-5; }
+}
+
+/* Water droplets moving along the drip line while the valve is open */
+.drip-open {
+  background-image: repeating-linear-gradient(90deg, #5fb3c4 0 12px, transparent 12px 24px);
+  background-size: 24px 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flow { animation: none; }
+}

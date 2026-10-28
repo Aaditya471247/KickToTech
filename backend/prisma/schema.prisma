@@ -1,0 +1,165 @@
+// JalMitra database schema. Telemetry is converted to a TimescaleDB hypertable by prisma/timescale.sql.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FARMER
+  ADMIN
+}
+
+enum SensorType {
+  START_0M
+  MID_5M
+  END_10M
+}
+
+enum SensorStatus {
+  ONLINE
+  OFFLINE
+  LOW_BATTERY
+}
+
+enum ValveMode {
+  AUTO
+  MANUAL
+}
+
+enum CropStage {
+  SOWING
+  GERMINATION
+  VEGETATIVE
+  FLOWERING
+  HARVEST
+}
+
+enum RemedyCategory {
+  PEST
+  DISEASE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  phone        String   @unique
+  passwordHash String
+  region       String   @default("Maharashtra")
+  role         Role     @default(FARMER)
+  createdAt    DateTime @default(now())
+  farms        Farm[]
+}
+
+model Farm {
+  id            String         @id @default(uuid())
+  userId        String
+  name          String
+  totalArea     Float // acres
+  soilType      String
+  latitude      Float          @default(18.15)
+  longitude     Float          @default(74.58)
+  // Drip valve state (single solenoid per farm row)
+  valveOpen     Boolean        @default(false)
+  valveMode     ValveMode      @default(AUTO)
+  valveOpenedAt DateTime?
+  flowRateLpm   Float          @default(20) // litres per minute through the drip line
+  createdAt     DateTime       @default(now())
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sensors       Sensor[]
+  portfolios    CropPortfolio[]
+  valveEvents   ValveEvent[]
+}
+
+model Sensor {
+  id            String       @id @default(uuid())
+  farmId        String
+  sensorType    SensorType
+  status        SensorStatus @default(ONLINE)
+  batteryLevel  Float        @default(100)
+  signalQuality Int          @default(100)
+  lastSeenAt    DateTime?
+  farm          Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  telemetry     Telemetry[]
+
+  @@unique([farmId, sensorType])
+}
+
+model Telemetry {
+  id          String   @default(uuid())
+  sensorId    String
+  moisture    Float // % volumetric
+  temperature Float // deg C
+  timestamp   DateTime @default(now())
+  sensor      Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  // Hypertables require the time column inside every unique index
+  @@id([id, timestamp])
+  @@index([sensorId, timestamp(sort: Desc)])
+}
+
+model ValveEvent {
+  id        String   @id @default(uuid())
+  farmId    String
+  action    String // OPEN | CLOSE
+  reason    String
+  litres    Float? // litres delivered during the run (set on CLOSE)
+  createdAt DateTime @default(now())
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, createdAt])
+}
+
+model CropPortfolio {
+  id             String       @id @default(uuid())
+  farmId         String
+  cropName       String
+  variety        String       @default("")
+  sowingDate     DateTime
+  status         CropStage    @default(SOWING)
+  totalWaterUsed Float        @default(0) // litres actually applied
+  createdAt      DateTime     @default(now())
+  farm           Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  records        FarmRecord[]
+}
+
+model FarmRecord {
+  id          String        @id @default(uuid())
+  portfolioId String
+  date        DateTime
+  stage       CropStage
+  activity    String
+  expense     Float         @default(0)
+  income      Float         @default(0)
+  waterLitres Float         @default(0) // manual irrigation not metered by the valve
+  notes       String?
+  portfolio   CropPortfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, date])
+}
+
+model NaturalRemedy {
+  id          String         @id @default(uuid())
+  targetPest  String
+  remedyName  String         @unique
+  category    RemedyCategory @default(PEST)
+  ingredients String[]
+  preparation String[]
+  dosage      String
+  timing      String
+  safety      String
+}
+
+model BioFertilizer {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  summary         String
+  ingredients     String[]
+  steps           String[]
+  applicationRate String
+  curingDays      Int
+  benefits        String[]
+}
